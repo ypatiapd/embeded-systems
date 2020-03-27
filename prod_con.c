@@ -30,7 +30,10 @@ void *consumer (void *args);
 
 //struct with arguments for the functions.Contains arguments for each type of function, and 
 //depending on the type of function chosen, the suitable arguments are used.
-
+//the busy variable is used to prevent a producer to alter a struct of arguments that is being used of the struct array
+//the functionType variable is used to define the type of the function that will be executed from a consumer
+//the variables startTime and endTime are used to store the time that the struct workFunction
+//was added to the queue and the time that was picked up from the queue.
  struct AllArgs{    
   int x;
   int y;
@@ -41,6 +44,7 @@ void *consumer (void *args);
   double endTime;
 } ;
 
+//struct that contains a pointer to a function and a pointer to a struct of arguments for the function
 struct workFunction { 
   void * (*work)();
   struct AllArgs (* arg);
@@ -63,10 +67,11 @@ void PrintHello(void);
 double Tan(double theta);int Sum(int x,int y);
 
 
-int numofProd;
-void* (*Functions[3])();
-struct AllArgs A[20];
-struct timeval tv;
+int numofProd;   //number of producers 
+void* (*Functions[3])();   //array of pointers to three types of functions. Sum,Tan , and simple hello message
+                           //Each function takes different number and types of arguments 
+struct AllArgs A[20];      //array of structs with the arguments.
+struct timeval tv;          
 long double  elapseTime[1000];  //array with all time elapses of one experiment
 int timeIndex;     //index to the array of  time elapses in one experiment
 int prodExit[1];   //array with all exit states of producers
@@ -77,10 +82,10 @@ int finished=0;    //is set when all producers have terminated
 
 int main ()
 {
-  long double wholeSum=0.0;
-  long double  wholeMed=0.0;
-  long double  medElapseTime=0.0;
-  long double   sum=0.0;
+  long double wholeSum=0.0;     //sum of the experiments median elapse time
+  long double  wholeMed=0.0;    //final median elapse time,of all the experiments
+  long double  medElapseTime=0.0; //median elapse time of one experiment
+  long double   sum=0.0;          //sum of one experiment's median elapse time
 
 
 
@@ -172,13 +177,13 @@ int main ()
     }
     if (sum<0)
        sum=15000;
-    medElapseTime=sum/((long double)timeIndex) ;   // to teleutaio thread to auksise 
+    medElapseTime=sum/((long double)timeIndex) ;   
     wholeSum=wholeSum + medElapseTime;
 
     // printf("medElapseTime= %Lf \n",medElapseTime);
     // printf("wholeSum=%Lf",wholeSum);
     queueDelete (fifo);
-  }//for exp
+  }
 
   wholeMed=wholeSum/((long double)EXP);
   printf("final median time=%Lf",wholeMed);
@@ -200,12 +205,12 @@ void *producer (void *q)
 
   for (i = 0; i < LOOP; i++) {
 
-    funcChoice=rand()%3+0;
-
+    funcChoice=rand()%3+0;   //random choice of function type
+    //depending on the function type choice, the producer sets the variables of the workFunction structure.
     if(funcChoice==0){
       wrk.work=Functions[0];
       do{
-        argChoice=rand()%20+0;
+        argChoice=rand()%20+0;   //random choice of arguments 
       }while((A[argChoice]).busy==1);
       wrk.arg=&(A[argChoice]);
       A[argChoice].busy=1;
@@ -237,7 +242,7 @@ void *producer (void *q)
      (*(wrk.arg)).functionType=2;
 
    }
-   pthread_mutex_lock (fifo->mut);
+   pthread_mutex_lock (fifo->mut);    //mutex locks for using the queue
    
     while (fifo->full) {
       printf ("producer: queue FULL.\n");
@@ -246,25 +251,27 @@ void *producer (void *q)
    gettimeofday(&tv,NULL);
    (*(wrk.arg)).startTime=tv.tv_usec;
 
-   queueAdd (fifo, wrk);
+   queueAdd (fifo, wrk);          
    pthread_mutex_unlock (fifo->mut);
    pthread_cond_signal (fifo->notEmpty);
    
   }
  
-  prodExit[exitIndex]=1;
+  prodExit[exitIndex]=1;  //sets one position of the exitArray when it terminates and inreases the exitIndex for the next producer that terminates 
   exitIndex++;
+	
+  //check if all the producers have terminated. If all the cells of the prodExit array are set, then all the producers have terminated
+  //and the finished variable is set.Now the consumers can terminate.
   for(int j=0;j<numofProd;j++){
      if( prodExit[j]==1){
          term++;
          if(term==numofProd){
-             finished=1;
+             finished=1;          
           }
       }
    }
 
-  for(int z=0;z<numofProd;z++)
-  pthread_cond_signal (fifo->notEmpty);
+  pthread_cond_signal (fifo->notEmpty);     
   return (NULL);
 }
 
@@ -294,12 +301,12 @@ void *consumer (void *q)
       }
        
 
-      d.work =( fifo->buf[fifo->head]).work;
-      d.arg=(( fifo->buf[fifo->head]).arg);
-      gettimeofday(&tv,NULL);
-      (*(d.arg)).endTime=tv.tv_usec;
-      elapseTime[timeIndex]=(*(d.arg)).endTime-(*(d.arg)).startTime;
-      timeIndex++;
+      d.work =( fifo->buf[fifo->head]).work;     //save the index of the function 
+      d.arg=(( fifo->buf[fifo->head]).arg);      //save the args for the function
+      gettimeofday(&tv,NULL);              
+      (*(d.arg)).endTime=tv.tv_usec;          
+      elapseTime[timeIndex]=(*(d.arg)).endTime-(*(d.arg)).startTime;    //subtruct start and end time to get the elapse time
+      timeIndex++;    //increase index for the next time measurement
 
       queueDel (fifo,&d);
       pthread_mutex_unlock (fifo->mut);      //unlock the mutex before the execution of the functions , so this part can be done in parallel
@@ -310,16 +317,16 @@ void *consumer (void *q)
 
       if(funcType==0){
      
-        (*(d.work))((*(d.arg)).x,(*(d.arg)).y);
-        (*(d.arg)).busy=0;
+        (*(d.work))((*(d.arg)).x,(*(d.arg)).y);    //if function type is 0 , then consumer uses the arguments for Sum function.
+        (*(d.arg)).busy=0;   //free the specific struct for next consumer
        }
 
       if(funcType==2){  
-        (*(d.work))();
+        (*(d.work))();      //if function type is 2 , then the consumer uses no arguments
         (*(d.arg)).busy=0;
        }
       if(funcType==1){   
-        (*(d.work))((*(d.arg)).theta);
+        (*(d.work))((*(d.arg)).theta);    //if the function type is 1, then the consumer uses the argument for Tan function.
         (*(d.arg)).busy=0;
 
        }
