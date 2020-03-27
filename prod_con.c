@@ -1,4 +1,9 @@
-/*hort	: A solution to the producer consumer problem using
+/*
+ *	File	: pc.c
+ *
+ *	Title	: Demo Producer/Consumer.
+ *
+ *	Short	: A solution to the producer consumer problem using
  *		pthreads.	
  *
  *	Long 	:
@@ -273,15 +278,15 @@ void *consumer (void *q)
 
     while(1) {
         pthread_mutex_lock (fifo->mut);
-        if(finished==1){
+        if(finished==1){                   //consumer termination condition,when all the producers have terminated
            pthread_mutex_unlock (fifo->mut);
-           pthread_cond_signal (fifo->notEmpty);
+           pthread_cond_signal (fifo->notEmpty);    
            return(NULL);
          }
      while (fifo->empty) {                
-        if(finished==1){
+        if(finished==1){                       //consumer termination condition ,when all the producers have terminated
         pthread_mutex_unlock (fifo->mut);
-        pthread_cond_signal (fifo->notEmpty);
+        pthread_cond_signal (fifo->notEmpty);   ////in that case fifo is empty but we send the signal to let the other consumers terminate
         return(NULL);
       }
  
@@ -298,7 +303,7 @@ void *consumer (void *q)
       timeIndex++;
 
       queueDel (fifo,&d);
-      pthread_mutex_unlock (fifo->mut);
+      pthread_mutex_unlock (fifo->mut);      //unlock the mutex before the execution of the functions , so this part can be done in parallel
       pthread_cond_signal (fifo->notFull);
 
       funcType=(*(d.arg)).functionType;
