@@ -199,12 +199,6 @@ void *producer (void *q)
 
 
   for (i = 0; i < LOOP; i++) {
-    pthread_mutex_lock (fifo->mut);
-   
-    while (fifo->full) {
-      printf ("producer: queue FULL.\n");
-      pthread_cond_wait (fifo->notFull, fifo->mut);
-    }
 
     funcChoice=rand()%3+0;
 
@@ -243,7 +237,12 @@ void *producer (void *q)
      (*(wrk.arg)).functionType=2;
 
    }
-
+   pthread_mutex_lock (fifo->mut);
+   
+    while (fifo->full) {
+      printf ("producer: queue FULL.\n");
+      pthread_cond_wait (fifo->notFull, fifo->mut);
+    }
    gettimeofday(&tv,NULL);
    (*(wrk.arg)).startTime=tv.tv_usec;
 
